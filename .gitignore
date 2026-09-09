@@ -5,6 +5,8 @@
 .env.*
 !.env.example
 *.env
+backend/.env
+backend/credentials.json
 
 # ==========================================
 # Python & Virtual Environments (FastAPI)
