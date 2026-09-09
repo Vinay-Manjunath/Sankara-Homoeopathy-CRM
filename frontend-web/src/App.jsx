@@ -467,21 +467,20 @@ export default function App() {
         return (
             <div className="min-h-screen bg-[#FAF7F2] flex items-center justify-center p-4">
                 <div className="max-w-md w-full bg-white rounded-3xl p-8 border border-slate-200 shadow-2xl text-center space-y-6">
-                    <div className="w-16 h-16 bg-[#502479] text-[#D4AF37] rounded-2xl flex items-center justify-center mx-auto text-2xl font-serif font-extrabold shadow-md">
-                        SH
-                    </div>
+                    <img 
+                        src="/logo.png" 
+                        alt="Sankara Homoeopathy Logo" 
+                        className="w-16 h-16 rounded-2xl mx-auto object-contain shadow-md"
+                    />
 
                     <div>
                         <h1 className="text-2xl font-bold text-[#502479] tracking-tight uppercase">Sankara Homoeopathy</h1>
                         <p className="text-xs text-slate-500 mt-1 uppercase tracking-wider font-semibold">
-                            Clinical Electronic Health Records & Case Management
+                            CRM
                         </p>
                     </div>
 
-                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-xs text-slate-600 flex items-center space-x-3 text-left">
-                        <ShieldCheck className="w-6 h-6 text-[#208396] shrink-0" />
-                        <span>Restricted medical portal. Access limited strictly to authorized clinic staff accounts.</span>
-                    </div>
+                    
 
                     {authError && (
                         <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-start space-x-2 text-left">
@@ -516,7 +515,7 @@ export default function App() {
                     {/* Clinic Brand with Logo */}
                     <div className="p-4 border-b border-purple-900/50 flex items-center space-x-3">
                         <img
-                            src="/logo.png"
+                            src="../public/logo.png"
                             alt="Sankara Homoeopathy Logo"
                             className="w-12 h-12 object-contain rounded-xl bg-white p-1 shadow-sm"
                             onError={(e) => {
