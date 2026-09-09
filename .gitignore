@@ -77,3 +77,9 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+
+*.json
+!package.json
+!tsconfig.json
+credentials.json
+backend/credentials.json
