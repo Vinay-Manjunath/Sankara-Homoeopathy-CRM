@@ -84,12 +84,6 @@ def get_current_user(authorization: Optional[str] = Header(None)) -> dict:
     token = authorization.split(" ")[1]
     return verify_google_jwt(token)
 
-
-# Example of how you protect existing routes:
-@app.get("/api/auth/me")
-def get_current_user_profile(user: dict = Depends(get_current_authorized_user)):
-    return {"authenticated": True, "user": user}
-
 def get_next_patient_id(db: Session) -> str:
     """
     Computes alphanumeric sequence:
