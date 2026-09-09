@@ -1,0 +1,42 @@
+services:
+  # -------------------------------------------------------------
+  # 1. FastAPI Backend Web Service
+  # -------------------------------------------------------------
+  - type: web
+    name: sankara-homoeopathy-backend
+    runtime: python
+    region: singapore       # Choose 'singapore' (closest to India) or 'frankfurt' / 'oregon'
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: DATABASE_URL
+        sync: false         # Fill in Render Dashboard (e.g. Neon PostgreSQL URL)
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+
+  # -------------------------------------------------------------
+  # 2. React (Vite) Frontend Static Site
+  # -------------------------------------------------------------
+  - type: staticSite
+    name: crm.sankarahomoeopathy
+    region: singapore
+    plan: free
+    rootDir: frontend-web
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    routes:
+      # SPA rewrite rule: Prevents 404 errors when refreshing inner pages
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: https://sankara-homoeopathy-backend.onrender.com/api
