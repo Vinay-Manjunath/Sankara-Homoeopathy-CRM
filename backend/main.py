@@ -1,9 +1,13 @@
 import json
+import os
 from datetime import date, datetime
 from typing import List, Optional
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form, Response
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form, Response, Header
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
 
 from database import engine, Base, get_db
 from models import Patient, Doctor, Medicine, Appointment, ConsultationCase, AppointmentType
@@ -19,14 +23,72 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Sankara Homoeopathy CRM Backend", version="1.0.0")
 
+origins = [
+    "http://localhost:5173",
+    "https://crm-sankarahomoeopathy.onrender.com",
+]
+
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+
 # Enable CORS for local dev, Render, and Cloudflare Pages
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+class GoogleAuthPayload(BaseModel):
+    credential: str  # The raw Google JWT ID token
+
+
+def verify_google_jwt(token: str) -> dict:
+    """Verifies that the token came from Google and was issued for your Client ID."""
+    if not GOOGLE_CLIENT_ID:
+        raise HTTPException(
+            status_code=500, detail="GOOGLE_CLIENT_ID not configured on server"
+        )
+    try:
+        # Google's public key verification
+        idinfo = id_token.verify_oauth2_token(
+            token, google_requests.Request(), GOOGLE_CLIENT_ID
+        )
+
+        return {
+            "email": idinfo.get("email", ""),
+            "name": idinfo.get("name", "Doctor"),
+            "picture": idinfo.get("picture", ""),
+        }
+    except ValueError:
+        raise HTTPException(status_code=401, detail="Invalid or expired Google Token")
+
+
+@app.post("/api/auth/google")
+def auth_google_login(payload: GoogleAuthPayload):
+    """Called after successful Google popup sign-in."""
+    user_info = verify_google_jwt(payload.credential)
+    return {
+        "status": "success",
+        "token": payload.credential,
+        "user": user_info,
+    }
+
+
+# Optional helper to protect internal endpoints
+def get_current_user(authorization: Optional[str] = Header(None)) -> dict:
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=401, detail="Missing or invalid Authorization header"
+        )
+    token = authorization.split(" ")[1]
+    return verify_google_jwt(token)
+
+
+# Example of how you protect existing routes:
+@app.get("/api/auth/me")
+def get_current_user_profile(user: dict = Depends(get_current_authorized_user)):
+    return {"authenticated": True, "user": user}
 
 def get_next_patient_id(db: Session) -> str:
     """
@@ -79,7 +141,7 @@ def bootstrap_database():
 # --- Health Check ---
 @app.get("/")
 def health_check():
-    return {"status": "healthy", "service": "AURA Clinic EHR API"}
+    return {"status": "healthy", "service": "Sankara Homoeopathy CRM API"}
 
 # --- Medicine Directory ---
 @app.get("/api/medicines", response_model=List[MedicineOut])

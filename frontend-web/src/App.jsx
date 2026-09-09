@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { GoogleLogin } from '@react-oauth/google';
 import {
     Calendar, Clock, User, Phone, Search, Plus, Eye, Download,
     CheckCircle, RefreshCw, FileText, UploadCloud, Copy, X,
     Stethoscope, CalendarPlus, Pencil, Trash2, MessageCircle,
-    RotateCcw
+    RotateCcw, ShieldCheck, LogOut, AlertCircle
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
@@ -16,6 +17,50 @@ const DOCTORS = [
 ];
 
 export default function App() {
+    // --- AUTHENTICATION STATE ---
+    const [currentUser, setCurrentUser] = useState(() => {
+        try {
+            const saved = localStorage.getItem('sankara_user');
+            return saved ? JSON.parse(saved) : null;
+        } catch {
+            return null;
+        }
+    });
+    const [authError, setAuthError] = useState('');
+
+    // Attach JWT Bearer token to all outgoing requests
+    useEffect(() => {
+        if (currentUser?.token) {
+            axios.defaults.headers.common['Authorization'] = `Bearer ${currentUser.token}`;
+        } else {
+            delete axios.defaults.headers.common['Authorization'];
+        }
+    }, [currentUser]);
+
+    const handleGoogleSuccess = async (credentialResponse) => {
+        setAuthError('');
+        try {
+            const res = await axios.post(`${API_BASE}/auth/google`, {
+                credential: credentialResponse.credential
+            });
+            const sessionData = {
+                token: res.data.token,
+                ...res.data.user
+            };
+            setCurrentUser(sessionData);
+            localStorage.setItem('sankara_user', JSON.stringify(sessionData));
+        } catch (err) {
+            const msg = err.response?.data?.detail || "Authorization failed. Check if your email is on the clinic whitelist.";
+            setAuthError(msg);
+        }
+    };
+
+    const handleLogout = () => {
+        setCurrentUser(null);
+        localStorage.removeItem('sankara_user');
+        delete axios.defaults.headers.common['Authorization'];
+    };
+
     // Navigation: 'appointments' | 'consultation' | 'followups'
     const [currentView, setCurrentView] = useState('appointments');
 
@@ -76,15 +121,17 @@ export default function App() {
     ]);
     const [dynamicFields, setDynamicFields] = useState({});
 
-    // Staged Upload Documents (Multi-document support with pre-upload removal)
+    // Staged Upload Documents
     const [selectedFiles, setSelectedFiles] = useState([]);
 
     useEffect(() => {
-        fetchMedicines();
-        fetchAppointments();
-        fetchFollowups();
-        loadPatient('ongaa01');
-    }, []);
+        if (currentUser) {
+            fetchMedicines();
+            fetchAppointments();
+            fetchFollowups();
+            loadPatient('ongaa01');
+        }
+    }, [currentUser]);
 
     const fetchMedicines = async () => {
         try {
@@ -139,7 +186,6 @@ export default function App() {
         setRxMeds([{ medicine: '', potency: '200C', medicine_days: '3times', suggested_duration: '15 Days', progress: '' }]);
     };
 
-    // Launch consultation from appointment row (+ button)
     const handleLaunchConsultationFromAppt = (appt) => {
         loadPatient(appt.patient_id);
         resetConsultationForm();
@@ -148,7 +194,6 @@ export default function App() {
         setCurrentView('consultation');
     };
 
-    // Delete Appointment directly
     const handleDeleteAppointment = async (apptId) => {
         if (!window.confirm(`Delete Appointment #${apptId}?`)) return;
         try {
@@ -159,7 +204,6 @@ export default function App() {
         }
     };
 
-    // Add Custom Remedy not in DB
     const handleSaveCustomMedicine = async (e) => {
         e.preventDefault();
         if (!newMedInput.trim()) return;
@@ -174,7 +218,6 @@ export default function App() {
         }
     };
 
-    // Populate form to EDIT existing case
     const startEditCase = async (caseId) => {
         try {
             const res = await axios.get(`${API_BASE}/cases/${caseId}`);
@@ -194,7 +237,6 @@ export default function App() {
         }
     };
 
-    // Delete Consultation Case
     const handleDeleteCase = async (caseId) => {
         if (!window.confirm(`Are you sure you want to permanently delete Consultation #${caseId}?`)) {
             return;
@@ -211,7 +253,6 @@ export default function App() {
         }
     };
 
-    // Open Edit Patient Modal
     const openEditPatientModal = () => {
         if (!activePatient) return;
         setEditPatientForm({
@@ -225,7 +266,6 @@ export default function App() {
         setShowEditPatientModal(true);
     };
 
-    // PUT: Update Patient
     const handleUpdatePatient = async (e) => {
         e.preventDefault();
         try {
@@ -247,7 +287,6 @@ export default function App() {
         }
     };
 
-    // File Upload Handlers
     const handleFileSelection = (e) => {
         if (e.target.files) {
             const newlyAdded = Array.from(e.target.files);
@@ -293,7 +332,6 @@ export default function App() {
         setRxMeds(rxMeds.filter((_, i) => i !== idx));
     };
 
-    // Copy prior findings
     const copyPreviousFindings = async () => {
         if (activePatientCases.length === 0) {
             alert("No prior consultations exist for this patient.");
@@ -309,7 +347,6 @@ export default function App() {
         }
     };
 
-    // Save Consultation Case
     const handleSaveConsultation = async (e) => {
         e.preventDefault();
         if (!activePatient) {
@@ -356,7 +393,6 @@ export default function App() {
         }
     };
 
-    // Register New Patient
     const handleSavePatient = async (e) => {
         e.preventDefault();
         try {
@@ -373,7 +409,6 @@ export default function App() {
         }
     };
 
-    // Book Appointment
     const handleSaveAppointment = async (e) => {
         e.preventDefault();
         try {
@@ -391,7 +426,6 @@ export default function App() {
         }
     };
 
-    // WhatsApp redirect helper
     const openWhatsApp = (contact, patientName, followupDate) => {
         const cleanNumber = contact.replace(/[^0-9]/g, '');
         const message = encodeURIComponent(
@@ -400,7 +434,6 @@ export default function App() {
         window.open(`https://wa.me/${cleanNumber}?text=${message}`, '_blank');
     };
 
-    // Helper: Computes patient-specific visit number chronologically (Visit #1, Visit #2, ...)
     const getPatientVisitNumber = (caseId) => {
         if (!caseId || !activePatientCases.length) return '';
         const sorted = [...activePatientCases].sort((a, b) => {
@@ -411,18 +444,15 @@ export default function App() {
         return idx !== -1 ? `#${idx + 1}` : `Case #${caseId}`;
     };
 
-    // Filtered Appointments
     const filteredAppointments = appointments.filter(a => {
         const docMatch = apptDoctorFilter === 'ALL' || a.assigned_doctor === apptDoctorFilter;
         const typeMatch = apptTypeFilter === 'ALL' || a.app_type === apptTypeFilter;
         const apptDateStr = a.app_datetime ? a.app_datetime.split('T')[0] : '';
         const fromMatch = !apptDateFrom || apptDateStr >= apptDateFrom;
         const toMatch = !apptDateTo || apptDateStr <= apptDateTo;
-
         return docMatch && typeMatch && fromMatch && toMatch;
     });
 
-    // Filtered Followups
     const filteredFollowups = followupsList.filter(f => {
         const doctorMatch = followupDoctorFilter === 'ALL' || f.doctor_name === followupDoctorFilter;
         const fromMatch = !followupDateFrom || f.followup_date >= followupDateFrom;
@@ -430,6 +460,53 @@ export default function App() {
         return doctorMatch && fromMatch && toMatch;
     });
 
+    // =========================================================================
+    // GOOGLE OAUTH GATE: Rendered if no active verified session exists
+    // =========================================================================
+    if (!currentUser) {
+        return (
+            <div className="min-h-screen bg-[#FAF7F2] flex items-center justify-center p-4">
+                <div className="max-w-md w-full bg-white rounded-3xl p-8 border border-slate-200 shadow-2xl text-center space-y-6">
+                    <div className="w-16 h-16 bg-[#502479] text-[#D4AF37] rounded-2xl flex items-center justify-center mx-auto text-2xl font-serif font-extrabold shadow-md">
+                        SH
+                    </div>
+
+                    <div>
+                        <h1 className="text-2xl font-bold text-[#502479] tracking-tight uppercase">Sankara Homoeopathy</h1>
+                        <p className="text-xs text-slate-500 mt-1 uppercase tracking-wider font-semibold">
+                            Clinical Electronic Health Records & Case Management
+                        </p>
+                    </div>
+
+                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-xs text-slate-600 flex items-center space-x-3 text-left">
+                        <ShieldCheck className="w-6 h-6 text-[#208396] shrink-0" />
+                        <span>Restricted medical portal. Access limited strictly to authorized clinic staff accounts.</span>
+                    </div>
+
+                    {authError && (
+                        <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-start space-x-2 text-left">
+                            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                            <span>{authError}</span>
+                        </div>
+                    )}
+
+                    <div className="flex justify-center pt-2">
+                        <GoogleLogin
+                            onSuccess={handleGoogleSuccess}
+                            onError={() => setAuthError("Google Sign-In was cancelled or failed.")}
+                            theme="outline"
+                            shape="pill"
+                            size="large"
+                        />
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // =========================================================================
+    // MAIN CLINICAL APPLICATION VIEW
+    // =========================================================================
     return (
         <div className="flex h-screen bg-[#FAF7F2] font-sans antialiased text-slate-800">
 
@@ -485,22 +562,52 @@ export default function App() {
                     </nav>
                 </div>
 
-                {/* Sidebar Action Buttons */}
-                <div className="p-4 border-t border-purple-900/50 bg-[#381755]/50 space-y-2">
-                    <button
-                        onClick={() => setShowNewApptModal(true)}
-                        className="w-full py-2 bg-[#208396] hover:bg-[#165c69] text-white rounded-lg text-xs font-bold flex items-center justify-center space-x-1.5 transition"
-                    >
-                        <CalendarPlus className="w-3.5 h-3.5" />
-                        <span>Book Appointment</span>
-                    </button>
-                    <button
-                        onClick={() => setShowNewPatientModal(true)}
-                        className="w-full py-2 bg-[#D4AF37] hover:bg-[#b89326] text-slate-900 rounded-lg text-xs font-bold flex items-center justify-center space-x-1.5 transition"
-                    >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>New Patient</span>
-                    </button>
+                {/* Sidebar Footer with Quick Actions & Authenticated User Profile */}
+                <div>
+                    <div className="p-4 border-t border-purple-900/50 bg-[#381755]/50 space-y-2">
+                        <button
+                            onClick={() => setShowNewApptModal(true)}
+                            className="w-full py-2 bg-[#208396] hover:bg-[#165c69] text-white rounded-lg text-xs font-bold flex items-center justify-center space-x-1.5 transition"
+                        >
+                            <CalendarPlus className="w-3.5 h-3.5" />
+                            <span>Book Appointment</span>
+                        </button>
+                        <button
+                            onClick={() => setShowNewPatientModal(true)}
+                            className="w-full py-2 bg-[#D4AF37] hover:bg-[#b89326] text-slate-900 rounded-lg text-xs font-bold flex items-center justify-center space-x-1.5 transition"
+                        >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>New Patient</span>
+                        </button>
+                    </div>
+
+                    {/* Authenticated Staff Badge & Sign Out Button */}
+                    <div className="p-3 border-t border-purple-900/60 bg-[#2b0f44] flex items-center justify-between">
+                        <div className="flex items-center space-x-2.5 overflow-hidden">
+                            {currentUser.picture ? (
+                                <img
+                                    src={currentUser.picture}
+                                    alt=""
+                                    className="w-7 h-7 rounded-full border border-[#D4AF37] shrink-0"
+                                />
+                            ) : (
+                                <div className="w-7 h-7 rounded-full bg-purple-800 text-[#D4AF37] font-bold text-xs flex items-center justify-center shrink-0">
+                                    {currentUser.name?.[0] || 'U'}
+                                </div>
+                            )}
+                            <div className="truncate">
+                                <p className="text-xs font-bold text-white truncate">{currentUser.name}</p>
+                                <p className="text-[10px] text-purple-300 truncate">{currentUser.email}</p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={handleLogout}
+                            title="Sign Out"
+                            className="p-1.5 rounded-lg text-purple-300 hover:text-white hover:bg-white/10 transition"
+                        >
+                            <LogOut className="w-4 h-4" />
+                        </button>
+                    </div>
                 </div>
             </aside>
 
@@ -546,7 +653,6 @@ export default function App() {
                                     </>
                                 )}
 
-                                {/* Edit Patient Button */}
                                 <button
                                     onClick={openEditPatientModal}
                                     className="ml-2 p-1.5 bg-white text-[#502479] hover:bg-[#502479] hover:text-white rounded-lg border border-slate-200 transition shadow-2xs"
@@ -586,11 +692,9 @@ export default function App() {
                 {/* WORKSPACE ROUTER */}
                 <main className="flex-1 overflow-y-auto p-6">
 
-                    {/* VIEW 1: APPOINTMENTS WITH FULL FILTERS & DATE RANGE */}
+                    {/* VIEW 1: APPOINTMENTS */}
                     {currentView === 'appointments' && (
                         <div className="space-y-5">
-
-                            {/* Filter Panel */}
                             <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
                                 <div className="flex items-center justify-between">
                                     <div>
@@ -605,7 +709,6 @@ export default function App() {
                                     </span>
                                 </div>
 
-                                {/* Filters Row */}
                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 pt-3 border-t text-xs">
                                     <div>
                                         <label className="font-semibold text-slate-600 block mb-1">Consultant</label>
@@ -669,7 +772,6 @@ export default function App() {
                                 </div>
                             </div>
 
-                            {/* Table of Appointments */}
                             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                                 <table className="w-full text-left text-xs border-collapse">
                                     <thead className="bg-[#FAF7F2] text-slate-600 font-bold border-b border-slate-200">
@@ -736,8 +838,6 @@ export default function App() {
                     {/* VIEW 2: CONSULTATION DESK */}
                     {currentView === 'consultation' && (
                         <div className="space-y-6">
-
-                            {/* HISTORICAL CONSULTATIONS TABLE ON TOP WITH PATIENT VISIT # COLUMN */}
                             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                                 <div className="p-4 border-b flex justify-between items-center bg-[#FAF7F2]">
                                     <div>
@@ -788,7 +888,6 @@ export default function App() {
                                                         </td>
                                                         <td className="p-2.5 text-slate-600">{c.followup_date || '--'}</td>
                                                         <td className="p-2.5 text-slate-700">{c.medicines?.map(m => m.medicine).join(', ') || '--'}</td>
-
                                                         <td className="p-2.5 text-center">
                                                             <button
                                                                 onClick={() => startEditCase(c.id)}
@@ -798,7 +897,6 @@ export default function App() {
                                                                 <Pencil className="w-3.5 h-3.5" />
                                                             </button>
                                                         </td>
-
                                                         <td className="p-2.5 text-center">
                                                             <button
                                                                 onClick={async () => {
@@ -811,7 +909,6 @@ export default function App() {
                                                                 <Eye className="w-3.5 h-3.5" />
                                                             </button>
                                                         </td>
-
                                                         <td className="p-2.5 text-center">
                                                             <a
                                                                 href={`${API_BASE}/cases/${c.id}/pdf`}
@@ -823,7 +920,6 @@ export default function App() {
                                                                 <Download className="w-3.5 h-3.5" />
                                                             </a>
                                                         </td>
-
                                                         <td className="p-2.5 text-center">
                                                             <button
                                                                 onClick={() => handleDeleteCase(c.id)}
@@ -841,9 +937,8 @@ export default function App() {
                                 </div>
                             </div>
 
-                            {/* NEW OR EDIT CONSULTATION ENTRY FORM */}
+                            {/* CONSULTATION ENTRY FORM */}
                             <form onSubmit={handleSaveConsultation} className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-7">
-
                                 <div className="flex items-center justify-between border-b pb-4">
                                     <div>
                                         <div className="flex items-center space-x-2">
@@ -927,7 +1022,6 @@ export default function App() {
                                         </div>
                                     </div>
 
-                                    {/* ENLARGED CLINICAL OBSERVATIONS TEXTBOX */}
                                     <div>
                                         <label className="font-semibold text-slate-600 block mb-1 text-xs">
                                             Clinical Observations & Case Highlights (Enlarged)
@@ -936,12 +1030,12 @@ export default function App() {
                                             rows={6}
                                             value={clinicalObs}
                                             onChange={e => setClinicalObs(e.target.value)}
-                                            placeholder="Enter detailed presenting symptoms, mental disposition, modalities, tongue coat, thermals, and specific homeopathic totality..."
+                                            placeholder="Enter presenting symptoms, modalities, totality..."
                                             className="w-full border border-slate-300 rounded-xl p-3 text-xs focus:ring-2 focus:ring-[#208396] focus:outline-none min-h-[140px]"
                                         />
                                     </div>
 
-                                    {/* Prescription Table with + Custom Remedy */}
+                                    {/* Prescribed Medicines */}
                                     <div className="bg-[#FAF7F2] p-4 rounded-xl border border-slate-200 space-y-3">
                                         <div className="flex justify-between items-center">
                                             <span className="text-xs font-bold text-[#502479] uppercase">Prescribed Medicines</span>
@@ -1014,12 +1108,11 @@ export default function App() {
                                         ))}
                                     </div>
 
-                                    {/* Multi-Document Upload with Staging & Pre-Upload Delete */}
+                                    {/* Multi-Document Upload */}
                                     <div className="space-y-2">
                                         <label className="text-xs font-bold text-slate-700 block">
                                             Patient Documents, Lab Reports & Clinical Photos
                                         </label>
-
                                         <div className="flex items-center space-x-3">
                                             <label className="cursor-pointer px-4 py-2 bg-[#208396] hover:bg-[#165c69] text-white text-xs font-bold rounded-xl flex items-center space-x-1.5 shadow-sm transition">
                                                 <UploadCloud className="w-4 h-4" />
@@ -1036,7 +1129,6 @@ export default function App() {
                                             </span>
                                         </div>
 
-                                        {/* Staged File Cards List */}
                                         {selectedFiles.length > 0 && (
                                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 pt-2">
                                                 {selectedFiles.map((file, idx) => (
@@ -1130,8 +1222,6 @@ export default function App() {
                                 {/* SECTION 4: GENERAL EXAMINATION */}
                                 <div className="space-y-3 border-t pt-5">
                                     <h3 className="text-xs font-bold uppercase tracking-wider text-[#502479]">Section 4: General Examination</h3>
-
-                                    {/* Vitals with auto-BMI */}
                                     <div className="grid grid-cols-2 md:grid-cols-6 gap-2 text-xs bg-[#FAF7F2] p-3 rounded-xl border border-slate-200">
                                         <div>
                                             <label className="font-bold text-slate-600 block text-[10px]">BP (mmHg)</label>
@@ -1218,7 +1308,6 @@ export default function App() {
                                     </div>
                                 </div>
 
-                                {/* Submit Buttons */}
                                 <div className="flex justify-end space-x-3 pt-3">
                                     <button
                                         type="button"
@@ -1235,7 +1324,6 @@ export default function App() {
                                         <span>{editingCaseId ? `Update ${getPatientVisitNumber(editingCaseId)}` : "Save Consultation & Complete Visit"}</span>
                                     </button>
                                 </div>
-
                             </form>
                         </div>
                     )}
@@ -1243,8 +1331,6 @@ export default function App() {
                     {/* VIEW 3: UPCOMING FOLLOW-UPS HUB */}
                     {currentView === 'followups' && (
                         <div className="space-y-5">
-
-                            {/* Header & Filter Bar */}
                             <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
                                 <div className="flex items-center justify-between">
                                     <div>
@@ -1256,7 +1342,6 @@ export default function App() {
                                     </span>
                                 </div>
 
-                                {/* Filter Controls */}
                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-2 border-t text-xs">
                                     <div>
                                         <label className="font-semibold text-slate-600 block mb-1">Doctor Filter</label>
@@ -1298,7 +1383,6 @@ export default function App() {
                                 </div>
                             </div>
 
-                            {/* Table of Followups */}
                             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                                 <table className="w-full text-left text-xs border-collapse">
                                     <thead className="bg-[#FAF7F2] text-slate-600 font-bold border-b border-slate-200">
@@ -1359,10 +1443,8 @@ export default function App() {
                                     </tbody>
                                 </table>
                             </div>
-
                         </div>
                     )}
-
                 </main>
             </div>
 
@@ -1410,7 +1492,6 @@ export default function App() {
                             <h3 className="font-bold text-sm text-[#502479]">Edit Patient ({activePatient?.patient_id})</h3>
                             <button onClick={() => setShowEditPatientModal(false)} className="text-slate-400 font-bold">✕</button>
                         </div>
-
                         <form onSubmit={handleUpdatePatient} className="space-y-3 text-xs">
                             <div>
                                 <label className="font-semibold text-slate-600 block mb-1">Full Patient Name</label>
@@ -1422,7 +1503,6 @@ export default function App() {
                                     className="w-full border rounded-lg p-2"
                                 />
                             </div>
-
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="font-semibold text-slate-600 block mb-1">Age</label>
@@ -1445,7 +1525,6 @@ export default function App() {
                                     />
                                 </div>
                             </div>
-
                             <div>
                                 <label className="font-semibold text-slate-600 block mb-1">End Date</label>
                                 <input
@@ -1455,7 +1534,6 @@ export default function App() {
                                     className="w-full border rounded-lg p-2"
                                 />
                             </div>
-
                             <div>
                                 <label className="font-semibold text-slate-600 block mb-1">Email Address</label>
                                 <input
@@ -1465,7 +1543,6 @@ export default function App() {
                                     className="w-full border rounded-lg p-2"
                                 />
                             </div>
-
                             <div>
                                 <label className="font-semibold text-slate-600 block mb-1">Treatment Protocol</label>
                                 <input
@@ -1475,7 +1552,6 @@ export default function App() {
                                     className="w-full border rounded-lg p-2"
                                 />
                             </div>
-
                             <div className="flex justify-end space-x-2 pt-2">
                                 <button
                                     type="button"
@@ -1506,7 +1582,6 @@ export default function App() {
                             </h3>
                             <button onClick={() => setViewCaseModal(null)} className="text-slate-400 font-bold">✕</button>
                         </div>
-
                         <div className="text-xs space-y-3">
                             <div className="flex justify-between items-center">
                                 <p><b>Attending Doctor:</b> {viewCaseModal.doctor_name}</p>
