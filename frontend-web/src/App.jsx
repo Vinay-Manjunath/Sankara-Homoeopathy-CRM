@@ -515,7 +515,7 @@ export default function App() {
                     {/* Clinic Brand with Logo */}
                     <div className="p-4 border-b border-purple-900/50 flex items-center space-x-3">
                         <img
-                            src="../public/logo.png"
+                            src="logo.png"
                             alt="Sankara Homoeopathy Logo"
                             className="w-12 h-12 object-contain rounded-xl bg-white p-1 shadow-sm"
                             onError={(e) => {
