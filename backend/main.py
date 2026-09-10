@@ -116,13 +116,13 @@ def auth_google_login(payload: GoogleAuthPayload):
 
 def get_next_patient_id(db: Session) -> str:
     """Computes alphanumeric sequence: ongaa01 -> ongaa99, ongab01 -> ongba01."""
-    last = db.query(Patient).filter(Patient.patient_id.like("ong%")).order_by(Patient.patient_id.desc()).first()
+    last = db.query(Patient).filter(Patient.patient_id.like("ONG%")).order_by(Patient.patient_id.desc()).first()
     if not last:
-        return "ongaa01"
+        return "ONGAA01"
 
     curr_id = last.patient_id[3:]
     if len(curr_id) != 4:
-        return "ongaa01"
+        return "ONGAA01"
 
     c1, c2 = curr_id[0], curr_id[1]
     num = int(curr_id[2:])
@@ -131,13 +131,13 @@ def get_next_patient_id(db: Session) -> str:
         num += 1
     else:
         num = 1
-        if c2 < 'z':
+        if c2 < 'Z':
             c2 = chr(ord(c2) + 1)
         else:
-            c2 = 'a'
-            c1 = chr(ord(c1) + 1) if c1 < 'z' else 'a'
+            c2 = 'A'
+            c1 = chr(ord(c1) + 1) if c1 < 'Z' else 'A'
 
-    return f"ong{c1}{c2}{num:02d}"
+    return f"ONG{c1}{c2}{num:02d}"
 
 
 @app.on_event("startup")
