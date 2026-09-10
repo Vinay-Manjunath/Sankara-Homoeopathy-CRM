@@ -81,7 +81,7 @@ export default function App() {
     const [followupDateTo, setFollowupDateTo] = useState('');
 
     // Active Patient Context (Only for Consultation Desk)
-    const [activePatientId, setActivePatientId] = useState('');
+    const [activePatientId, setActivePatientId] = useState('ONGAA01');
     const [activePatient, setActivePatient] = useState(null);
     const [activePatientCases, setActivePatientCases] = useState([]);
 
