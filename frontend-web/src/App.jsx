@@ -129,7 +129,7 @@ export default function App() {
             fetchMedicines();
             fetchAppointments();
             fetchFollowups();
-            loadPatient('ongaa01');
+            loadPatient('ONGAA01');
         }
     }, [currentUser]);
 
