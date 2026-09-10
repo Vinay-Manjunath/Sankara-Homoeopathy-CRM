@@ -622,7 +622,7 @@ export default function App() {
                                     type="text"
                                     placeholder="Patient ID (e.g. ongaa01)"
                                     value={activePatientId}
-                                    onChange={e => setActivePatientId(e.target.value.toLowerCase)}
+                                    onChange={e => setActivePatientId(e.target.value.toUpperCase())}
                                     className="pl-8 pr-3 py-1.5 border border-slate-300 rounded-lg text-xs font-mono font-bold w-48 focus:ring-2 focus:ring-[#208396] focus:outline-none"
                                 />
                                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
