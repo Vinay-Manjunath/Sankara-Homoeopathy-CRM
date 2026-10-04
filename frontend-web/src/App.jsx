@@ -274,6 +274,26 @@ export default function App() {
         }
     };
 
+    // Authenticated PDF file download handler
+    const handleDownloadPdf = async (caseId, patientId) => {
+        try {
+            const response = await axios.get(`${API_BASE}/cases/${caseId}/pdf`, {
+                responseType: 'blob'
+            });
+            const blob = new Blob([response.data], { type: 'application/pdf' });
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `Prescription_${patientId || 'Case'}_${caseId}.pdf`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            alert("Failed to download PDF: " + (err.response?.data?.detail || err.message));
+        }
+    };
+
     const openEditPatientModal = () => {
         if (!activePatient) return;
         setEditPatientForm({
@@ -657,7 +677,7 @@ export default function App() {
                 </div>
             </aside>
 
-            {/* MAIN VIEWPORT (min-w-0 ensures flex container calculates shrink boundaries) */}
+            {/* MAIN VIEWPORT (min-w-0 prevents layout overflow) */}
             <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
 
                 {/* TOP CONTEXT BAR */}
@@ -960,15 +980,14 @@ export default function App() {
                                                             </button>
                                                         </td>
                                                         <td className="p-2.5 text-center whitespace-nowrap">
-                                                            <a
-                                                                href={`${API_BASE}/cases/${c.id}/pdf`}
-                                                                target="_blank"
-                                                                rel="noreferrer"
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleDownloadPdf(c.id, c.patient_id || activePatient?.patient_id)}
                                                                 className="inline-block p-1 rounded bg-teal-50 text-[#208396] hover:bg-[#208396] hover:text-white transition"
                                                                 title="Download Letterhead PDF"
                                                             >
                                                                 <Download className="w-3.5 h-3.5" />
-                                                            </a>
+                                                            </button>
                                                         </td>
                                                         <td className="p-2.5 text-center whitespace-nowrap">
                                                             <button
@@ -1498,7 +1517,7 @@ export default function App() {
                         </div>
                     )}
 
-                    {/* VIEW 4: ALL PREVIOUS VISITS ARCHIVE (GUARANTEED HORIZONTAL SCROLL) */}
+                    {/* VIEW 4: ALL PREVIOUS VISITS ARCHIVE (SCROLL FIX + AUTHENTICATED PDF) */}
                     {currentView === 'history' && (
                         <div className="space-y-5">
                             <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
@@ -1590,7 +1609,7 @@ export default function App() {
                                 </div>
                             </div>
 
-                            {/* All Visits Data Table with scrollable layout */}
+                            {/* All Visits Data Table with explicit scroll wrapper */}
                             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden w-full">
                                 <div className="w-full overflow-x-auto block">
                                     <table className="w-full min-w-[1250px] table-fixed text-left text-xs border-collapse">
@@ -1662,15 +1681,14 @@ export default function App() {
                                                             </button>
                                                         </td>
                                                         <td className="p-3 text-center whitespace-nowrap">
-                                                            <a
-                                                                href={`${API_BASE}/cases/${c.id}/pdf`}
-                                                                target="_blank"
-                                                                rel="noreferrer"
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleDownloadPdf(c.id, c.patient_id)}
                                                                 className="inline-block p-1.5 rounded-lg bg-teal-50 text-[#208396] hover:bg-[#208396] hover:text-white transition shadow-2xs"
                                                                 title="Download Rx PDF"
                                                             >
                                                                 <Download className="w-3.5 h-3.5" />
-                                                            </a>
+                                                            </button>
                                                         </td>
                                                         <td className="p-3 text-center whitespace-nowrap">
                                                             <button
@@ -1840,14 +1858,14 @@ export default function App() {
                                         }}
                                         className="px-2.5 py-1 bg-amber-100 text-amber-800 rounded-md font-bold flex items-center space-x-1"
                                     >
-                                        <Pencil className="w-3 h-3" />
+                                        <Pencil className="w-3.5 h-3.5" />
                                         <span>Edit Case</span>
                                     </button>
                                     <button
                                         onClick={() => handleDeleteCase(viewCaseModal.id)}
                                         className="px-2.5 py-1 bg-rose-100 text-rose-800 rounded-md font-bold flex items-center space-x-1"
                                     >
-                                        <Trash2 className="w-3 h-3" />
+                                        <Trash2 className="w-3.5 h-3.5" />
                                         <span>Delete</span>
                                     </button>
                                 </div>
