@@ -6,6 +6,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# --- Force SQLAlchemy to use psycopg2 from requirements.txt ---
+raw_db_url = os.environ.get("DATABASE_URL", "")
+if raw_db_url.startswith("postgres://"):
+    os.environ["DATABASE_URL"] = raw_db_url.replace("postgres://", "postgresql+psycopg2://", 1)
+elif raw_db_url.startswith("postgresql://") and not raw_db_url.startswith("postgresql+"):
+    os.environ["DATABASE_URL"] = raw_db_url.replace("postgresql://", "postgresql+psycopg2://", 1)
+# ----------------------------------------------------------------
+
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form, Response, Header
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -13,6 +21,7 @@ from pydantic import BaseModel
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 
+# Now when database.py imports, it reads the updated URL and uses psycopg2
 from database import engine, Base, get_db
 from models import Patient, Doctor, Medicine, Appointment, ConsultationCase, AppointmentType
 from schemas import (
@@ -115,7 +124,7 @@ def auth_google_login(payload: GoogleAuthPayload):
 
 
 def get_next_patient_id(db: Session) -> str:
-    """Computes alphanumeric sequence: ongaa01 -> ongaa99, ongab01 -> ongba01."""
+    """Computes alphanumeric sequence: ONGA01 -> ONGA99, ONGAA01 -> ONGAA99."""
     last = db.query(Patient).filter(Patient.patient_id.like("ONG%")).order_by(Patient.patient_id.desc()).first()
     if not last:
         return "ONGAA01"
@@ -294,7 +303,46 @@ def delete_appointment(appointment_id: int, db: Session = Depends(get_db), user:
     return {"status": "success", "message": f"Appointment #{appointment_id} removed"}
 
 
-# --- Consultation Cases ---
+# --- Consultation Cases & Master History ---
+
+# NEW: Master Visit Archives Route called by fetchAllVisits()
+@app.get("/api/cases")
+def get_all_cases(
+    doctor_name: Optional[str] = None,
+    patient_id: Optional[str] = None,
+    db: Session = Depends(get_db),
+    user: dict = Depends(require_auth_user)
+):
+    """Fetches all visit records joined with patient details for the Master Visit History table."""
+    q = db.query(ConsultationCase, Patient).join(
+        Patient, ConsultationCase.patient_id == Patient.patient_id
+    )
+
+    if doctor_name and doctor_name != "ALL":
+        q = q.filter(ConsultationCase.doctor_name == doctor_name)
+    if patient_id:
+        q = q.filter(ConsultationCase.patient_id.ilike(f"%{patient_id}%"))
+
+    cases = q.order_by(ConsultationCase.consultation_date.desc(), ConsultationCase.id.desc()).all()
+
+    return [
+        {
+            "id": c.id,
+            "patient_id": c.patient_id,
+            "patient_name": p.name,
+            "doctor_name": c.doctor_name,
+            "consultation_date": c.consultation_date,
+            "clinical_observations": c.clinical_observations,
+            "followup_date": c.followup_date,
+            "patient_status": c.patient_status,
+            "medicines": c.medicines or [],
+            "entered_data": c.entered_data or {},
+            "attachments": c.attachments or []
+        }
+        for c, p in cases
+    ]
+
+
 @app.get("/api/patients/{patient_id}/cases", response_model=List[CaseSummaryOut])
 def get_cases_for_patient(patient_id: str, db: Session = Depends(get_db), user: dict = Depends(require_auth_user)):
     return (
