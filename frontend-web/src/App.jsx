@@ -5,7 +5,7 @@ import {
     Calendar, Clock, User, Phone, Search, Plus, Eye, Download,
     CheckCircle, RefreshCw, FileText, UploadCloud, Copy, X,
     Stethoscope, CalendarPlus, Pencil, Trash2, MessageCircle,
-    RotateCcw, ShieldCheck, LogOut, AlertCircle
+    RotateCcw, ShieldCheck, LogOut, AlertCircle, History
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
@@ -61,13 +61,14 @@ export default function App() {
         delete axios.defaults.headers.common['Authorization'];
     };
 
-    // Navigation: 'appointments' | 'consultation' | 'followups'
+    // Navigation: 'appointments' | 'consultation' | 'followups' | 'history'
     const [currentView, setCurrentView] = useState('appointments');
 
     // Master Data
     const [appointments, setAppointments] = useState([]);
     const [medicinesList, setMedicinesList] = useState([]);
     const [followupsList, setFollowupsList] = useState([]);
+    const [allCasesList, setAllCasesList] = useState([]); // Master history of all visits
 
     // Appointments Hub Filters
     const [apptDoctorFilter, setApptDoctorFilter] = useState('ALL');
@@ -79,6 +80,12 @@ export default function App() {
     const [followupDoctorFilter, setFollowupDoctorFilter] = useState('ALL');
     const [followupDateFrom, setFollowupDateFrom] = useState('');
     const [followupDateTo, setFollowupDateTo] = useState('');
+
+    // All Visits History Filters
+    const [historyPatientQuery, setHistoryPatientQuery] = useState('');
+    const [historyDoctorFilter, setHistoryDoctorFilter] = useState('ALL');
+    const [historyDateFrom, setHistoryDateFrom] = useState('');
+    const [historyDateTo, setHistoryDateTo] = useState('');
 
     // Active Patient Context (Only for Consultation Desk)
     const [activePatientId, setActivePatientId] = useState('ONGAA01');
@@ -129,6 +136,7 @@ export default function App() {
             fetchMedicines();
             fetchAppointments();
             fetchFollowups();
+            fetchAllVisits();
             loadPatient('ONGAA01');
         }
     }, [currentUser]);
@@ -157,6 +165,15 @@ export default function App() {
             setFollowupsList(res.data);
         } catch (e) {
             console.error(e);
+        }
+    };
+
+    const fetchAllVisits = async () => {
+        try {
+            const res = await axios.get(`${API_BASE}/cases`);
+            setAllCasesList(res.data);
+        } catch (e) {
+            console.error("Could not fetch case history:", e);
         }
     };
 
@@ -218,10 +235,13 @@ export default function App() {
         }
     };
 
-    const startEditCase = async (caseId) => {
+    const startEditCase = async (caseId, patientId = null) => {
         try {
             const res = await axios.get(`${API_BASE}/cases/${caseId}`);
             const c = res.data;
+            if (patientId || c.patient_id) {
+                await loadPatient(patientId || c.patient_id);
+            }
             setEditingCaseId(c.id);
             setDoctorName(c.doctor_name || DOCTORS[0]);
             setConsultDate(c.consultation_date || '');
@@ -246,8 +266,9 @@ export default function App() {
             alert(`Consultation Case #${caseId} deleted.`);
             if (viewCaseModal?.id === caseId) setViewCaseModal(null);
             if (editingCaseId === caseId) resetConsultationForm();
-            loadPatient(activePatient.patient_id);
+            if (activePatient) loadPatient(activePatient.patient_id);
             fetchFollowups();
+            fetchAllVisits();
         } catch (err) {
             alert("Failed to delete case: " + err.message);
         }
@@ -282,6 +303,7 @@ export default function App() {
             setShowEditPatientModal(false);
             fetchAppointments();
             fetchFollowups();
+            fetchAllVisits();
         } catch (err) {
             alert("Failed to update patient: " + err.message);
         }
@@ -387,7 +409,8 @@ export default function App() {
             resetConsultationForm();
             loadPatient(activePatient.patient_id);
             fetchFollowups();
-            setCurrentView('followups');
+            fetchAllVisits();
+            setCurrentView('history');
         } catch (err) {
             alert("Save failed: " + err.message);
         }
@@ -427,7 +450,7 @@ export default function App() {
     };
 
     const openWhatsApp = (contact, patientName, followupDate) => {
-        const cleanNumber = contact.replace(/[^0-9]/g, '');
+        const cleanNumber = contact ? contact.replace(/[^0-9]/g, '') : '';
         const message = encodeURIComponent(
             `Hello ${patientName}, this is a gentle reminder from Sankara Homoeopathy regarding your scheduled follow-up consultation on ${followupDate}. Please contact us if you need to reschedule.`
         );
@@ -460,8 +483,27 @@ export default function App() {
         return doctorMatch && fromMatch && toMatch;
     });
 
+    // All Visits History Filter & Sort (Recent at the Top)
+    const filteredAllCases = allCasesList
+        .filter(c => {
+            const query = historyPatientQuery.trim().toLowerCase();
+            const patientMatch = !query || 
+                (c.patient_id && c.patient_id.toLowerCase().includes(query)) ||
+                (c.patient_name && c.patient_name.toLowerCase().includes(query));
+            const docMatch = historyDoctorFilter === 'ALL' || c.doctor_name === historyDoctorFilter;
+            const cDate = c.consultation_date || '';
+            const fromMatch = !historyDateFrom || cDate >= historyDateFrom;
+            const toMatch = !historyDateTo || cDate <= historyDateTo;
+            return patientMatch && docMatch && fromMatch && toMatch;
+        })
+        .sort((a, b) => {
+            // Sort by consultation date descending (most recent first)
+            const dateDiff = new Date(b.consultation_date) - new Date(a.consultation_date);
+            return dateDiff !== 0 ? dateDiff : (b.id - a.id);
+        });
+
     // =========================================================================
-    // GOOGLE OAUTH GATE: Rendered if no active verified session exists
+    // GOOGLE OAUTH GATE
     // =========================================================================
     if (!currentUser) {
         return (
@@ -479,8 +521,6 @@ export default function App() {
                             CRM
                         </p>
                     </div>
-
-                    
 
                     {authError && (
                         <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-start space-x-2 text-left">
@@ -558,10 +598,19 @@ export default function App() {
                             <Clock className="w-4 h-4" />
                             <span>Follow-ups Schedule</span>
                         </button>
+
+                        {/* NEW SECTION NAVIGATION: ALL VISITS */}
+                        <button
+                            onClick={() => { fetchAllVisits(); setCurrentView('history'); }}
+                            className={`w-full flex items-center space-x-3 px-3.5 py-3 rounded-xl transition ${currentView === 'history' ? 'bg-white/15 text-[#D4AF37] shadow-inner' : 'text-purple-100 hover:bg-white/5'}`}
+                        >
+                            <History className="w-4 h-4" />
+                            <span>All Visits History</span>
+                        </button>
                     </nav>
                 </div>
 
-                {/* Sidebar Footer with Quick Actions & Authenticated User Profile */}
+                {/* Sidebar Footer */}
                 <div>
                     <div className="p-4 border-t border-purple-900/50 bg-[#381755]/50 space-y-2">
                         <button
@@ -580,7 +629,6 @@ export default function App() {
                         </button>
                     </div>
 
-                    {/* Authenticated Staff Badge & Sign Out Button */}
                     <div className="p-3 border-t border-purple-900/60 bg-[#2b0f44] flex items-center justify-between">
                         <div className="flex items-center space-x-2.5 overflow-hidden">
                             {currentUser.picture ? (
@@ -613,7 +661,7 @@ export default function App() {
             {/* MAIN VIEWPORT */}
             <div className="flex-1 flex flex-col overflow-hidden">
 
-                {/* TOP CONTEXT BAR: VISIBLE STRICTLY ON CONSULTATION DESK */}
+                {/* TOP CONTEXT BAR */}
                 {currentView === 'consultation' ? (
                     <header className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between shadow-xs">
                         <div className="flex items-center space-x-3">
@@ -666,7 +714,9 @@ export default function App() {
                     <header className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between shadow-xs">
                         <div className="flex items-center space-x-2">
                             <span className="text-xs font-bold text-[#502479] uppercase tracking-wider">
-                                {currentView === 'appointments' ? 'Reception & Scheduling Desk' : 'Follow-up Monitoring Desk'}
+                                {currentView === 'appointments' && 'Reception & Scheduling Desk'}
+                                {currentView === 'followups' && 'Follow-up Monitoring Desk'}
+                                {currentView === 'history' && 'Clinical Visit Archives & History'}
                             </span>
                         </div>
                         <div className="flex items-center space-x-2">
@@ -1444,6 +1494,197 @@ export default function App() {
                             </div>
                         </div>
                     )}
+
+                    {/* VIEW 4: ALL PREVIOUS VISITS ARCHIVE (NEW SECTION) */}
+                    {currentView === 'history' && (
+                        <div className="space-y-5">
+                            <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <h2 className="text-base font-bold text-slate-900 flex items-center space-x-2">
+                                            <History className="w-4 h-4 text-[#208396]" />
+                                            <span>Master Consultation & Visit Archives</span>
+                                        </h2>
+                                        <p className="text-xs text-slate-500">Sorted with the most recent visit first. Filter by Patient ID/Name, Date range, and Doctor.</p>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <button
+                                            onClick={fetchAllVisits}
+                                            className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center space-x-1 transition"
+                                            title="Reload all visits"
+                                        >
+                                            <RefreshCw className="w-3.5 h-3.5" />
+                                            <span>Refresh</span>
+                                        </button>
+                                        <span className="text-xs bg-[#e6f4f6] text-[#208396] px-3 py-1 rounded-full font-bold">
+                                            {filteredAllCases.length} Visits Found
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Filter Controls */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 pt-3 border-t text-xs">
+                                    <div>
+                                        <label className="font-semibold text-slate-600 block mb-1">Search Patient</label>
+                                        <div className="relative">
+                                            <input
+                                                type="text"
+                                                placeholder="ID or Name (e.g. ONGAA01)"
+                                                value={historyPatientQuery}
+                                                onChange={e => setHistoryPatientQuery(e.target.value)}
+                                                className="w-full pl-7 pr-3 py-2 border border-slate-300 rounded-lg font-medium"
+                                            />
+                                            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2 top-2.5" />
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="font-semibold text-slate-600 block mb-1">Consultant Doctor</label>
+                                        <select
+                                            value={historyDoctorFilter}
+                                            onChange={e => setHistoryDoctorFilter(e.target.value)}
+                                            className="w-full border border-slate-300 rounded-lg p-2 bg-white font-medium"
+                                        >
+                                            <option value="ALL">All Doctors</option>
+                                            {DOCTORS.map(d => <option key={d} value={d}>{d}</option>)}
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="font-semibold text-slate-600 block mb-1">Visit Date From</label>
+                                        <input
+                                            type="date"
+                                            value={historyDateFrom}
+                                            onChange={e => setHistoryDateFrom(e.target.value)}
+                                            className="w-full border border-slate-300 rounded-lg p-2"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="font-semibold text-slate-600 block mb-1">Visit Date To</label>
+                                        <input
+                                            type="date"
+                                            value={historyDateTo}
+                                            onChange={e => setHistoryDateTo(e.target.value)}
+                                            className="w-full border border-slate-300 rounded-lg p-2"
+                                        />
+                                    </div>
+
+                                    <div className="flex items-end">
+                                        <button
+                                            onClick={() => {
+                                                setHistoryPatientQuery('');
+                                                setHistoryDoctorFilter('ALL');
+                                                setHistoryDateFrom('');
+                                                setHistoryDateTo('');
+                                            }}
+                                            className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg transition flex items-center justify-center space-x-1.5"
+                                        >
+                                            <RotateCcw className="w-3.5 h-3.5" />
+                                            <span>Reset</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* All Visits Data Table */}
+                            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                                <table className="w-full text-left text-xs border-collapse">
+                                    <thead className="bg-[#FAF7F2] text-slate-600 font-bold border-b border-slate-200">
+                                        <tr>
+                                            <th className="p-3">Visit Date</th>
+                                            <th className="p-3">Patient ID</th>
+                                            <th className="p-3">Patient Name</th>
+                                            <th className="p-3">Attending Doctor</th>
+                                            <th className="p-3">Clinical Highlights</th>
+                                            <th className="p-3">Follow-up Date</th>
+                                            <th className="p-3">Medicines Prescribed</th>
+                                            <th className="p-3 text-center">Edit</th>
+                                            <th className="p-3 text-center">Inspect</th>
+                                            <th className="p-3 text-center">PDF</th>
+                                            <th className="p-3 text-center">Delete</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {filteredAllCases.length === 0 ? (
+                                            <tr>
+                                                <td colSpan="11" className="p-8 text-center text-slate-400 italic">
+                                                    No past visits match your search criteria.
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            filteredAllCases.map((c) => (
+                                                <tr key={c.id} className="hover:bg-slate-50 transition">
+                                                    <td className="p-3 font-bold text-slate-900 whitespace-nowrap">
+                                                        {c.consultation_date}
+                                                    </td>
+                                                    <td className="p-3 font-mono font-bold text-[#208396]">
+                                                        {c.patient_id}
+                                                    </td>
+                                                    <td className="p-3 font-bold text-slate-800">
+                                                        {c.patient_name || '--'}
+                                                    </td>
+                                                    <td className="p-3 font-medium text-[#502479]">
+                                                        {c.doctor_name}
+                                                    </td>
+                                                    <td className="p-3 max-w-xs truncate text-slate-600" title={c.clinical_observations || ''}>
+                                                        {c.clinical_observations || 'N/A'}
+                                                    </td>
+                                                    <td className="p-3 text-slate-600 whitespace-nowrap">
+                                                        {c.followup_date || '--'}
+                                                    </td>
+                                                    <td className="p-3 text-slate-700 max-w-xs truncate" title={c.medicines?.map(m => m.medicine).join(', ') || ''}>
+                                                        {c.medicines?.map(m => m.medicine).join(', ') || '--'}
+                                                    </td>
+                                                    <td className="p-3 text-center">
+                                                        <button
+                                                            onClick={() => startEditCase(c.id, c.patient_id)}
+                                                            className="p-1.5 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white transition shadow-2xs"
+                                                            title="Edit this Visit in Consultation Desk"
+                                                        >
+                                                            <Pencil className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </td>
+                                                    <td className="p-3 text-center">
+                                                        <button
+                                                            onClick={async () => {
+                                                                const res = await axios.get(`${API_BASE}/cases/${c.id}`);
+                                                                setViewCaseModal(res.data);
+                                                            }}
+                                                            className="p-1.5 rounded-lg bg-purple-50 text-[#502479] hover:bg-[#502479] hover:text-white transition shadow-2xs"
+                                                            title="Inspect Full Visit Details"
+                                                        >
+                                                            <Eye className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </td>
+                                                    <td className="p-3 text-center">
+                                                        <a
+                                                            href={`${API_BASE}/cases/${c.id}/pdf`}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            className="inline-block p-1.5 rounded-lg bg-teal-50 text-[#208396] hover:bg-[#208396] hover:text-white transition shadow-2xs"
+                                                            title="Download Rx PDF"
+                                                        >
+                                                            <Download className="w-3.5 h-3.5" />
+                                                        </a>
+                                                    </td>
+                                                    <td className="p-3 text-center">
+                                                        <button
+                                                            onClick={() => handleDeleteCase(c.id)}
+                                                            className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition shadow-2xs"
+                                                            title="Delete this Visit"
+                                                        >
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
                 </main>
             </div>
 
@@ -1588,8 +1829,9 @@ export default function App() {
                                     <button
                                         onClick={() => {
                                             const cid = viewCaseModal.id;
+                                            const pid = viewCaseModal.patient_id;
                                             setViewCaseModal(null);
-                                            startEditCase(cid);
+                                            startEditCase(cid, pid);
                                         }}
                                         className="px-2.5 py-1 bg-amber-100 text-amber-800 rounded-md font-bold flex items-center space-x-1"
                                     >
