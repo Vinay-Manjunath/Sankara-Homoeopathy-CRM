@@ -497,7 +497,6 @@ export default function App() {
             return patientMatch && docMatch && fromMatch && toMatch;
         })
         .sort((a, b) => {
-            // Sort by consultation date descending (most recent first)
             const dateDiff = new Date(b.consultation_date) - new Date(a.consultation_date);
             return dateDiff !== 0 ? dateDiff : (b.id - a.id);
         });
@@ -547,7 +546,7 @@ export default function App() {
     // MAIN CLINICAL APPLICATION VIEW
     // =========================================================================
     return (
-        <div className="flex h-screen bg-[#FAF7F2] font-sans antialiased text-slate-800">
+        <div className="flex h-screen w-screen overflow-hidden bg-[#FAF7F2] font-sans antialiased text-slate-800">
 
             {/* SIDEBAR NAVIGATION */}
             <aside className="w-64 bg-[#502479] text-white flex flex-col justify-between shrink-0 shadow-xl z-20">
@@ -599,7 +598,7 @@ export default function App() {
                             <span>Follow-ups Schedule</span>
                         </button>
 
-                        {/* NEW SECTION NAVIGATION: ALL VISITS */}
+                        {/* MASTER VISITS ARCHIVES */}
                         <button
                             onClick={() => { fetchAllVisits(); setCurrentView('history'); }}
                             className={`w-full flex items-center space-x-3 px-3.5 py-3 rounded-xl transition ${currentView === 'history' ? 'bg-white/15 text-[#D4AF37] shadow-inner' : 'text-purple-100 hover:bg-white/5'}`}
@@ -658,12 +657,12 @@ export default function App() {
                 </div>
             </aside>
 
-            {/* MAIN VIEWPORT */}
-            <div className="flex-1 flex flex-col overflow-hidden">
+            {/* MAIN VIEWPORT (min-w-0 ensures flex container calculates shrink boundaries) */}
+            <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
 
                 {/* TOP CONTEXT BAR */}
                 {currentView === 'consultation' ? (
-                    <header className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between shadow-xs">
+                    <header className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between shadow-xs shrink-0">
                         <div className="flex items-center space-x-3">
                             <div className="relative">
                                 <input
@@ -711,7 +710,7 @@ export default function App() {
                         )}
                     </header>
                 ) : (
-                    <header className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between shadow-xs">
+                    <header className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between shadow-xs shrink-0">
                         <div className="flex items-center space-x-2">
                             <span className="text-xs font-bold text-[#502479] uppercase tracking-wider">
                                 {currentView === 'appointments' && 'Reception & Scheduling Desk'}
@@ -739,7 +738,7 @@ export default function App() {
                 )}
 
                 {/* WORKSPACE ROUTER */}
-                <main className="flex-1 overflow-y-auto p-6">
+                <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden p-6">
 
                     {/* VIEW 1: APPOINTMENTS */}
                     {currentView === 'appointments' && (
@@ -821,65 +820,67 @@ export default function App() {
                                 </div>
                             </div>
 
-                            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                                <table className="w-full text-left text-xs border-collapse">
-                                    <thead className="bg-[#FAF7F2] text-slate-600 font-bold border-b border-slate-200">
-                                        <tr>
-                                            <th className="p-3">Patient ID</th>
-                                            <th className="p-3">Patient Name</th>
-                                            <th className="p-3">Age</th>
-                                            <th className="p-3">Mobile Contact</th>
-                                            <th className="p-3">Appt Type</th>
-                                            <th className="p-3">Date & Slot</th>
-                                            <th className="p-3">Assigned Doctor</th>
-                                            <th className="p-3 text-center">Consult</th>
-                                            <th className="p-3 text-center">Delete</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {filteredAppointments.length === 0 ? (
+                            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden w-full">
+                                <div className="w-full overflow-x-auto block">
+                                    <table className="w-full min-w-[950px] text-left text-xs border-collapse">
+                                        <thead className="bg-[#FAF7F2] text-slate-600 font-bold border-b border-slate-200">
                                             <tr>
-                                                <td colSpan="9" className="p-6 text-center text-slate-400 italic">No scheduled appointments matching the selected filters.</td>
+                                                <th className="p-3 whitespace-nowrap">Patient ID</th>
+                                                <th className="p-3 whitespace-nowrap">Patient Name</th>
+                                                <th className="p-3 whitespace-nowrap">Age</th>
+                                                <th className="p-3 whitespace-nowrap">Mobile Contact</th>
+                                                <th className="p-3 whitespace-nowrap">Appt Type</th>
+                                                <th className="p-3 whitespace-nowrap">Date & Slot</th>
+                                                <th className="p-3 whitespace-nowrap">Assigned Doctor</th>
+                                                <th className="p-3 text-center whitespace-nowrap">Consult</th>
+                                                <th className="p-3 text-center whitespace-nowrap">Delete</th>
                                             </tr>
-                                        ) : (
-                                            filteredAppointments.map(a => (
-                                                <tr key={a.id} className="hover:bg-slate-50 transition">
-                                                    <td className="p-3 font-mono font-bold text-[#208396]">{a.patient_id}</td>
-                                                    <td className="p-3 font-bold text-slate-900">{a.patient_name}</td>
-                                                    <td className="p-3">{a.patient_age}</td>
-                                                    <td className="p-3">{a.patient_contact}</td>
-                                                    <td className="p-3">
-                                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${a.app_type === 'new patient' ? 'bg-[#e6f4f6] text-[#208396]' : 'bg-[#fbf7eb] text-[#b89326]'}`}>
-                                                            {a.app_type}
-                                                        </span>
-                                                    </td>
-                                                    <td className="p-3 font-semibold text-slate-700">
-                                                        {new Date(a.app_datetime).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
-                                                    </td>
-                                                    <td className="p-3 font-bold text-[#502479]">{a.assigned_doctor}</td>
-                                                    <td className="p-3 text-center">
-                                                        <button
-                                                            onClick={() => handleLaunchConsultationFromAppt(a)}
-                                                            className="p-1.5 bg-[#208396] text-white hover:bg-[#165c69] rounded-lg transition shadow-2xs"
-                                                            title="Start Consultation & Load History"
-                                                        >
-                                                            <Plus className="w-4 h-4" />
-                                                        </button>
-                                                    </td>
-                                                    <td className="p-3 text-center">
-                                                        <button
-                                                            onClick={() => handleDeleteAppointment(a.id)}
-                                                            className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded-lg transition shadow-2xs"
-                                                            title="Cancel / Delete Appointment"
-                                                        >
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </button>
-                                                    </td>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {filteredAppointments.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan="9" className="p-6 text-center text-slate-400 italic">No scheduled appointments matching the selected filters.</td>
                                                 </tr>
-                                            ))
-                                        )}
-                                    </tbody>
-                                </table>
+                                            ) : (
+                                                filteredAppointments.map(a => (
+                                                    <tr key={a.id} className="hover:bg-slate-50 transition">
+                                                        <td className="p-3 font-mono font-bold text-[#208396] whitespace-nowrap">{a.patient_id}</td>
+                                                        <td className="p-3 font-bold text-slate-900 whitespace-nowrap">{a.patient_name}</td>
+                                                        <td className="p-3 whitespace-nowrap">{a.patient_age}</td>
+                                                        <td className="p-3 whitespace-nowrap">{a.patient_contact}</td>
+                                                        <td className="p-3 whitespace-nowrap">
+                                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${a.app_type === 'new patient' ? 'bg-[#e6f4f6] text-[#208396]' : 'bg-[#fbf7eb] text-[#b89326]'}`}>
+                                                                {a.app_type}
+                                                            </span>
+                                                        </td>
+                                                        <td className="p-3 font-semibold text-slate-700 whitespace-nowrap">
+                                                            {new Date(a.app_datetime).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                                                        </td>
+                                                        <td className="p-3 font-bold text-[#502479] whitespace-nowrap">{a.assigned_doctor}</td>
+                                                        <td className="p-3 text-center whitespace-nowrap">
+                                                            <button
+                                                                onClick={() => handleLaunchConsultationFromAppt(a)}
+                                                                className="p-1.5 bg-[#208396] text-white hover:bg-[#165c69] rounded-lg transition shadow-2xs"
+                                                                title="Start Consultation & Load History"
+                                                            >
+                                                                <Plus className="w-4 h-4" />
+                                                            </button>
+                                                        </td>
+                                                        <td className="p-3 text-center whitespace-nowrap">
+                                                            <button
+                                                                onClick={() => handleDeleteAppointment(a.id)}
+                                                                className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded-lg transition shadow-2xs"
+                                                                title="Cancel / Delete Appointment"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -887,7 +888,7 @@ export default function App() {
                     {/* VIEW 2: CONSULTATION DESK */}
                     {currentView === 'consultation' && (
                         <div className="space-y-6">
-                            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden w-full">
                                 <div className="p-4 border-b flex justify-between items-center bg-[#FAF7F2]">
                                     <div>
                                         <h2 className="text-sm font-bold text-[#502479] flex items-center space-x-2">
@@ -901,20 +902,20 @@ export default function App() {
                                     </span>
                                 </div>
 
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-left text-xs border-collapse">
+                                <div className="w-full overflow-x-auto block">
+                                    <table className="w-full min-w-[950px] text-left text-xs border-collapse">
                                         <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
                                             <tr>
-                                                <th className="p-2.5">Visit#</th>
-                                                <th className="p-2.5">Date</th>
-                                                <th className="p-2.5">Attending Doctor</th>
-                                                <th className="p-2.5">Clinical Observations</th>
-                                                <th className="p-2.5">Follow-up</th>
-                                                <th className="p-2.5">Remedies</th>
-                                                <th className="p-2.5 text-center">Edit</th>
-                                                <th className="p-2.5 text-center">Inspect</th>
-                                                <th className="p-2.5 text-center">PDF</th>
-                                                <th className="p-2.5 text-center">Delete</th>
+                                                <th className="p-2.5 whitespace-nowrap">Visit#</th>
+                                                <th className="p-2.5 whitespace-nowrap">Date</th>
+                                                <th className="p-2.5 whitespace-nowrap">Attending Doctor</th>
+                                                <th className="p-2.5 min-w-[200px]">Clinical Observations</th>
+                                                <th className="p-2.5 whitespace-nowrap">Follow-up</th>
+                                                <th className="p-2.5 min-w-[180px]">Remedies</th>
+                                                <th className="p-2.5 text-center whitespace-nowrap">Edit</th>
+                                                <th className="p-2.5 text-center whitespace-nowrap">Inspect</th>
+                                                <th className="p-2.5 text-center whitespace-nowrap">PDF</th>
+                                                <th className="p-2.5 text-center whitespace-nowrap">Delete</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
@@ -925,19 +926,19 @@ export default function App() {
                                             ) : (
                                                 activePatientCases.map((c) => (
                                                     <tr key={c.id} className="hover:bg-slate-50">
-                                                        <td className="p-2.5 font-bold text-[#208396]">
+                                                        <td className="p-2.5 font-bold text-[#208396] whitespace-nowrap">
                                                             <span className="bg-[#e6f4f6] px-2 py-0.5 rounded text-[11px] font-mono">
                                                                 {getPatientVisitNumber(c.id)}
                                                             </span>
                                                         </td>
-                                                        <td className="p-2.5 font-semibold text-slate-900">{c.consultation_date}</td>
-                                                        <td className="p-2.5 text-slate-700">{c.doctor_name}</td>
+                                                        <td className="p-2.5 font-semibold text-slate-900 whitespace-nowrap">{c.consultation_date}</td>
+                                                        <td className="p-2.5 text-slate-700 whitespace-nowrap">{c.doctor_name}</td>
                                                         <td className="p-2.5 max-w-xs truncate text-slate-600" title={c.clinical_observations || ''}>
                                                             {c.clinical_observations || 'N/A'}
                                                         </td>
-                                                        <td className="p-2.5 text-slate-600">{c.followup_date || '--'}</td>
-                                                        <td className="p-2.5 text-slate-700">{c.medicines?.map(m => m.medicine).join(', ') || '--'}</td>
-                                                        <td className="p-2.5 text-center">
+                                                        <td className="p-2.5 text-slate-600 whitespace-nowrap">{c.followup_date || '--'}</td>
+                                                        <td className="p-2.5 text-slate-700 max-w-xs truncate">{c.medicines?.map(m => m.medicine).join(', ') || '--'}</td>
+                                                        <td className="p-2.5 text-center whitespace-nowrap">
                                                             <button
                                                                 onClick={() => startEditCase(c.id)}
                                                                 className="p-1 rounded bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white transition"
@@ -946,7 +947,7 @@ export default function App() {
                                                                 <Pencil className="w-3.5 h-3.5" />
                                                             </button>
                                                         </td>
-                                                        <td className="p-2.5 text-center">
+                                                        <td className="p-2.5 text-center whitespace-nowrap">
                                                             <button
                                                                 onClick={async () => {
                                                                     const res = await axios.get(`${API_BASE}/cases/${c.id}`);
@@ -958,7 +959,7 @@ export default function App() {
                                                                 <Eye className="w-3.5 h-3.5" />
                                                             </button>
                                                         </td>
-                                                        <td className="p-2.5 text-center">
+                                                        <td className="p-2.5 text-center whitespace-nowrap">
                                                             <a
                                                                 href={`${API_BASE}/cases/${c.id}/pdf`}
                                                                 target="_blank"
@@ -969,7 +970,7 @@ export default function App() {
                                                                 <Download className="w-3.5 h-3.5" />
                                                             </a>
                                                         </td>
-                                                        <td className="p-2.5 text-center">
+                                                        <td className="p-2.5 text-center whitespace-nowrap">
                                                             <button
                                                                 onClick={() => handleDeleteCase(c.id)}
                                                                 className="p-1 rounded bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition"
@@ -1432,261 +1433,263 @@ export default function App() {
                                 </div>
                             </div>
 
-                            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                                <table className="w-full text-left text-xs border-collapse">
-                                    <thead className="bg-[#FAF7F2] text-slate-600 font-bold border-b border-slate-200">
-                                        <tr>
-                                            <th className="p-3">Follow-up Date</th>
-                                            <th className="p-3">Patient ID</th>
-                                            <th className="p-3">Patient Name</th>
-                                            <th className="p-3">Contact Number</th>
-                                            <th className="p-3">End Date</th>
-                                            <th className="p-3">Doctor</th>
-                                            <th className="p-3">Last Visit</th>
-                                            <th className="p-3 text-center">WhatsApp Alert</th>
-                                            <th className="p-3 text-center">Inspect Case</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {filteredFollowups.length === 0 ? (
+                            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden w-full">
+                                <div className="w-full overflow-x-auto block">
+                                    <table className="w-full min-w-[1000px] text-left text-xs border-collapse">
+                                        <thead className="bg-[#FAF7F2] text-slate-600 font-bold border-b border-slate-200">
                                             <tr>
-                                                <td colSpan="9" className="p-6 text-center text-slate-400 italic">No matching follow-ups found.</td>
+                                                <th className="p-3 whitespace-nowrap">Follow-up Date</th>
+                                                <th className="p-3 whitespace-nowrap">Patient ID</th>
+                                                <th className="p-3 whitespace-nowrap">Patient Name</th>
+                                                <th className="p-3 whitespace-nowrap">Contact Number</th>
+                                                <th className="p-3 whitespace-nowrap">End Date</th>
+                                                <th className="p-3 whitespace-nowrap">Doctor</th>
+                                                <th className="p-3 whitespace-nowrap">Last Visit</th>
+                                                <th className="p-3 text-center whitespace-nowrap">WhatsApp Alert</th>
+                                                <th className="p-3 text-center whitespace-nowrap">Inspect Case</th>
                                             </tr>
-                                        ) : (
-                                            filteredFollowups.map(f => (
-                                                <tr key={f.case_id} className="hover:bg-slate-50 transition">
-                                                    <td className="p-3 font-bold text-[#208396]">{f.followup_date}</td>
-                                                    <td className="p-3 font-mono font-bold text-slate-700">{f.patient_id}</td>
-                                                    <td className="p-3 font-bold text-slate-900">{f.patient_name}</td>
-                                                    <td className="p-3 font-semibold text-slate-700 flex items-center space-x-1.5 pt-3.5">
-                                                        <Phone className="w-3 h-3 text-[#208396]" />
-                                                        <span>{f.patient_contact}</span>
-                                                    </td>
-                                                    <td className="p-3 text-rose-600 font-semibold">{f.patient_end_date || '--'}</td>
-                                                    <td className="p-3 font-medium text-[#502479]">{f.doctor_name}</td>
-                                                    <td className="p-3 text-slate-500">{f.consultation_date}</td>
-                                                    <td className="p-3 text-center">
-                                                        <button
-                                                            onClick={() => openWhatsApp(f.patient_contact, f.patient_name, f.followup_date)}
-                                                            className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-bold flex items-center space-x-1 mx-auto transition shadow-xs"
-                                                            title="Send WhatsApp Follow-up Reminder"
-                                                        >
-                                                            <MessageCircle className="w-3.5 h-3.5" />
-                                                            <span>WhatsApp</span>
-                                                        </button>
-                                                    </td>
-                                                    <td className="p-3 text-center">
-                                                        <button
-                                                            onClick={async () => {
-                                                                const res = await axios.get(`${API_BASE}/cases/${f.case_id}`);
-                                                                setViewCaseModal(res.data);
-                                                            }}
-                                                            className="p-1 rounded bg-purple-50 text-[#502479] hover:bg-[#502479] hover:text-white"
-                                                        >
-                                                            <Eye className="w-4 h-4" />
-                                                        </button>
-                                                    </td>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {filteredFollowups.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan="9" className="p-6 text-center text-slate-400 italic">No matching follow-ups found.</td>
                                                 </tr>
-                                            ))
-                                        )}
-                                    </tbody>
-                                </table>
+                                            ) : (
+                                                filteredFollowups.map(f => (
+                                                    <tr key={f.case_id} className="hover:bg-slate-50 transition">
+                                                        <td className="p-3 font-bold text-[#208396] whitespace-nowrap">{f.followup_date}</td>
+                                                        <td className="p-3 font-mono font-bold text-slate-700 whitespace-nowrap">{f.patient_id}</td>
+                                                        <td className="p-3 font-bold text-slate-900 whitespace-nowrap">{f.patient_name}</td>
+                                                        <td className="p-3 font-semibold text-slate-700 flex items-center space-x-1.5 pt-3.5 whitespace-nowrap">
+                                                            <Phone className="w-3 h-3 text-[#208396]" />
+                                                            <span>{f.patient_contact}</span>
+                                                        </td>
+                                                        <td className="p-3 text-rose-600 font-semibold whitespace-nowrap">{f.patient_end_date || '--'}</td>
+                                                        <td className="p-3 font-medium text-[#502479] whitespace-nowrap">{f.doctor_name}</td>
+                                                        <td className="p-3 text-slate-500 whitespace-nowrap">{f.consultation_date}</td>
+                                                        <td className="p-3 text-center whitespace-nowrap">
+                                                            <button
+                                                                onClick={() => openWhatsApp(f.patient_contact, f.patient_name, f.followup_date)}
+                                                                className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-bold flex items-center space-x-1 mx-auto transition shadow-xs"
+                                                                title="Send WhatsApp Follow-up Reminder"
+                                                            >
+                                                                <MessageCircle className="w-3.5 h-3.5" />
+                                                                <span>WhatsApp</span>
+                                                            </button>
+                                                        </td>
+                                                        <td className="p-3 text-center whitespace-nowrap">
+                                                            <button
+                                                                onClick={async () => {
+                                                                    const res = await axios.get(`${API_BASE}/cases/${f.case_id}`);
+                                                                    setViewCaseModal(res.data);
+                                                                }}
+                                                                className="p-1 rounded bg-purple-50 text-[#502479] hover:bg-[#502479] hover:text-white"
+                                                            >
+                                                                <Eye className="w-4 h-4" />
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     )}
 
-                    {/* VIEW 4: ALL PREVIOUS VISITS ARCHIVE (HORIZONTAL SCROLL ENABLED) */}
-{currentView === 'history' && (
-    <div className="space-y-5">
-        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h2 className="text-base font-bold text-slate-900 flex items-center space-x-2">
-                        <History className="w-4 h-4 text-[#208396]" />
-                        <span>Master Consultation & Visit Archives</span>
-                    </h2>
-                    <p className="text-xs text-slate-500">Sorted with the most recent visit first. Filter by Patient ID/Name, Date range, and Doctor.</p>
-                </div>
-                <div className="flex items-center space-x-2">
-                    <button
-                        onClick={fetchAllVisits}
-                        className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center space-x-1 transition"
-                        title="Reload all visits"
-                    >
-                        <RefreshCw className="w-3.5 h-3.5" />
-                        <span>Refresh</span>
-                    </button>
-                    <span className="text-xs bg-[#e6f4f6] text-[#208396] px-3 py-1 rounded-full font-bold">
-                        {filteredAllCases.length} Visits Found
-                    </span>
-                </div>
-            </div>
-
-            {/* Filter Controls */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 pt-3 border-t text-xs">
-                <div>
-                    <label className="font-semibold text-slate-600 block mb-1">Search Patient</label>
-                    <div className="relative">
-                        <input
-                            type="text"
-                            placeholder="ID or Name (e.g. ONGAA01)"
-                            value={historyPatientQuery}
-                            onChange={e => setHistoryPatientQuery(e.target.value)}
-                            className="w-full pl-7 pr-3 py-2 border border-slate-300 rounded-lg font-medium"
-                        />
-                        <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2 top-2.5" />
-                    </div>
-                </div>
-
-                <div>
-                    <label className="font-semibold text-slate-600 block mb-1">Consultant Doctor</label>
-                    <select
-                        value={historyDoctorFilter}
-                        onChange={e => setHistoryDoctorFilter(e.target.value)}
-                        className="w-full border border-slate-300 rounded-lg p-2 bg-white font-medium"
-                    >
-                        <option value="ALL">All Doctors</option>
-                        {DOCTORS.map(d => <option key={d} value={d}>{d}</option>)}
-                    </select>
-                </div>
-
-                <div>
-                    <label className="font-semibold text-slate-600 block mb-1">Visit Date From</label>
-                    <input
-                        type="date"
-                        value={historyDateFrom}
-                        onChange={e => setHistoryDateFrom(e.target.value)}
-                        className="w-full border border-slate-300 rounded-lg p-2"
-                    />
-                </div>
-
-                <div>
-                    <label className="font-semibold text-slate-600 block mb-1">Visit Date To</label>
-                    <input
-                        type="date"
-                        value={historyDateTo}
-                        onChange={e => setHistoryDateTo(e.target.value)}
-                        className="w-full border border-slate-300 rounded-lg p-2"
-                    />
-                </div>
-
-                <div className="flex items-end">
-                    <button
-                        onClick={() => {
-                            setHistoryPatientQuery('');
-                            setHistoryDoctorFilter('ALL');
-                            setHistoryDateFrom('');
-                            setHistoryDateTo('');
-                        }}
-                        className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg transition flex items-center justify-center space-x-1.5"
-                    >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                        <span>Reset</span>
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        {/* All Visits Data Table with horizontal scroll container */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto w-full">
-                <table className="w-full min-w-[1100px] text-left text-xs border-collapse">
-                    <thead className="bg-[#FAF7F2] text-slate-600 font-bold border-b border-slate-200">
-                        <tr>
-                            <th className="p-3 whitespace-nowrap">Visit Date</th>
-                            <th className="p-3 whitespace-nowrap">Patient ID</th>
-                            <th className="p-3 whitespace-nowrap">Patient Name</th>
-                            <th className="p-3 whitespace-nowrap">Attending Doctor</th>
-                            <th className="p-3 min-w-[220px]">Clinical Highlights</th>
-                            <th className="p-3 whitespace-nowrap">Follow-up Date</th>
-                            <th className="p-3 min-w-[200px]">Medicines Prescribed</th>
-                            <th className="p-3 text-center whitespace-nowrap">Edit</th>
-                            <th className="p-3 text-center whitespace-nowrap">Inspect</th>
-                            <th className="p-3 text-center whitespace-nowrap">PDF</th>
-                            <th className="p-3 text-center whitespace-nowrap">Delete</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                        {filteredAllCases.length === 0 ? (
-                            <tr>
-                                <td colSpan="11" className="p-8 text-center text-slate-400 italic">
-                                    No past visits match your search criteria.
-                                </td>
-                            </tr>
-                        ) : (
-                            filteredAllCases.map((c) => (
-                                <tr key={c.id} className="hover:bg-slate-50 transition">
-                                    <td className="p-3 font-bold text-slate-900 whitespace-nowrap">
-                                        {c.consultation_date}
-                                    </td>
-                                    <td className="p-3 font-mono font-bold text-[#208396] whitespace-nowrap">
-                                        {c.patient_id}
-                                    </td>
-                                    <td className="p-3 font-bold text-slate-800 whitespace-nowrap">
-                                        {c.patient_name || '--'}
-                                    </td>
-                                    <td className="p-3 font-medium text-[#502479] whitespace-nowrap">
-                                        {c.doctor_name}
-                                    </td>
-                                    <td className="p-3 max-w-xs truncate text-slate-600" title={c.clinical_observations || ''}>
-                                        {c.clinical_observations || 'N/A'}
-                                    </td>
-                                    <td className="p-3 text-slate-600 whitespace-nowrap">
-                                        {c.followup_date || '--'}
-                                    </td>
-                                    <td className="p-3 text-slate-700 max-w-xs truncate" title={c.medicines?.map(m => m.medicine).join(', ') || ''}>
-                                        {c.medicines?.map(m => m.medicine).join(', ') || '--'}
-                                    </td>
-                                    <td className="p-3 text-center whitespace-nowrap">
+                    {/* VIEW 4: ALL PREVIOUS VISITS ARCHIVE (GUARANTEED HORIZONTAL SCROLL) */}
+                    {currentView === 'history' && (
+                        <div className="space-y-5">
+                            <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <h2 className="text-base font-bold text-slate-900 flex items-center space-x-2">
+                                            <History className="w-4 h-4 text-[#208396]" />
+                                            <span>Master Consultation & Visit Archives</span>
+                                        </h2>
+                                        <p className="text-xs text-slate-500">Sorted with the most recent visit first. Filter by Patient ID/Name, Date range, and Doctor.</p>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
                                         <button
-                                            onClick={() => startEditCase(c.id, c.patient_id)}
-                                            className="p-1.5 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white transition shadow-2xs"
-                                            title="Edit this Visit in Consultation Desk"
+                                            onClick={fetchAllVisits}
+                                            className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center space-x-1 transition"
+                                            title="Reload all visits"
                                         >
-                                            <Pencil className="w-3.5 h-3.5" />
+                                            <RefreshCw className="w-3.5 h-3.5" />
+                                            <span>Refresh</span>
                                         </button>
-                                    </td>
-                                    <td className="p-3 text-center whitespace-nowrap">
+                                        <span className="text-xs bg-[#e6f4f6] text-[#208396] px-3 py-1 rounded-full font-bold">
+                                            {filteredAllCases.length} Visits Found
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Filter Controls */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 pt-3 border-t text-xs">
+                                    <div>
+                                        <label className="font-semibold text-slate-600 block mb-1">Search Patient</label>
+                                        <div className="relative">
+                                            <input
+                                                type="text"
+                                                placeholder="ID or Name (e.g. ONGAA01)"
+                                                value={historyPatientQuery}
+                                                onChange={e => setHistoryPatientQuery(e.target.value)}
+                                                className="w-full pl-7 pr-3 py-2 border border-slate-300 rounded-lg font-medium"
+                                            />
+                                            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2 top-2.5" />
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="font-semibold text-slate-600 block mb-1">Consultant Doctor</label>
+                                        <select
+                                            value={historyDoctorFilter}
+                                            onChange={e => setHistoryDoctorFilter(e.target.value)}
+                                            className="w-full border border-slate-300 rounded-lg p-2 bg-white font-medium"
+                                        >
+                                            <option value="ALL">All Doctors</option>
+                                            {DOCTORS.map(d => <option key={d} value={d}>{d}</option>)}
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="font-semibold text-slate-600 block mb-1">Visit Date From</label>
+                                        <input
+                                            type="date"
+                                            value={historyDateFrom}
+                                            onChange={e => setHistoryDateFrom(e.target.value)}
+                                            className="w-full border border-slate-300 rounded-lg p-2"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="font-semibold text-slate-600 block mb-1">Visit Date To</label>
+                                        <input
+                                            type="date"
+                                            value={historyDateTo}
+                                            onChange={e => setHistoryDateTo(e.target.value)}
+                                            className="w-full border border-slate-300 rounded-lg p-2"
+                                        />
+                                    </div>
+
+                                    <div className="flex items-end">
                                         <button
-                                            onClick={async () => {
-                                                const res = await axios.get(`${API_BASE}/cases/${c.id}`);
-                                                setViewCaseModal(res.data);
+                                            onClick={() => {
+                                                setHistoryPatientQuery('');
+                                                setHistoryDoctorFilter('ALL');
+                                                setHistoryDateFrom('');
+                                                setHistoryDateTo('');
                                             }}
-                                            className="p-1.5 rounded-lg bg-purple-50 text-[#502479] hover:bg-[#502479] hover:text-white transition shadow-2xs"
-                                            title="Inspect Full Visit Details"
+                                            className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg transition flex items-center justify-center space-x-1.5"
                                         >
-                                            <Eye className="w-3.5 h-3.5" />
+                                            <RotateCcw className="w-3.5 h-3.5" />
+                                            <span>Reset</span>
                                         </button>
-                                    </td>
-                                    <td className="p-3 text-center whitespace-nowrap">
-                                        <a
-                                            href={`${API_BASE}/cases/${c.id}/pdf`}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="inline-block p-1.5 rounded-lg bg-teal-50 text-[#208396] hover:bg-[#208396] hover:text-white transition shadow-2xs"
-                                            title="Download Rx PDF"
-                                        >
-                                            <Download className="w-3.5 h-3.5" />
-                                        </a>
-                                    </td>
-                                    <td className="p-3 text-center whitespace-nowrap">
-                                        <button
-                                            onClick={() => handleDeleteCase(c.id)}
-                                            className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition shadow-2xs"
-                                            title="Delete this Visit"
-                                        >
-                                            <Trash2 className="w-3.5 h-3.5" />
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-)}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* All Visits Data Table with scrollable layout */}
+                            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden w-full">
+                                <div className="w-full overflow-x-auto block">
+                                    <table className="w-full min-w-[1250px] table-fixed text-left text-xs border-collapse">
+                                        <thead className="bg-[#FAF7F2] text-slate-600 font-bold border-b border-slate-200">
+                                            <tr>
+                                                <th className="p-3 w-[110px] whitespace-nowrap">Visit Date</th>
+                                                <th className="p-3 w-[110px] whitespace-nowrap">Patient ID</th>
+                                                <th className="p-3 w-[160px] whitespace-nowrap">Patient Name</th>
+                                                <th className="p-3 w-[180px] whitespace-nowrap">Attending Doctor</th>
+                                                <th className="p-3 w-[260px]">Clinical Highlights</th>
+                                                <th className="p-3 w-[110px] whitespace-nowrap">Follow-up Date</th>
+                                                <th className="p-3 w-[240px]">Medicines Prescribed</th>
+                                                <th className="p-3 w-[60px] text-center whitespace-nowrap">Edit</th>
+                                                <th className="p-3 w-[60px] text-center whitespace-nowrap">Inspect</th>
+                                                <th className="p-3 w-[60px] text-center whitespace-nowrap">PDF</th>
+                                                <th className="p-3 w-[60px] text-center whitespace-nowrap">Delete</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {filteredAllCases.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan="11" className="p-8 text-center text-slate-400 italic">
+                                                        No past visits match your search criteria.
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                filteredAllCases.map((c) => (
+                                                    <tr key={c.id} className="hover:bg-slate-50 transition">
+                                                        <td className="p-3 font-bold text-slate-900 whitespace-nowrap">
+                                                            {c.consultation_date}
+                                                        </td>
+                                                        <td className="p-3 font-mono font-bold text-[#208396] whitespace-nowrap">
+                                                            {c.patient_id}
+                                                        </td>
+                                                        <td className="p-3 font-bold text-slate-800 truncate" title={c.patient_name || ''}>
+                                                            {c.patient_name || '--'}
+                                                        </td>
+                                                        <td className="p-3 font-medium text-[#502479] truncate" title={c.doctor_name || ''}>
+                                                            {c.doctor_name}
+                                                        </td>
+                                                        <td className="p-3 truncate text-slate-600" title={c.clinical_observations || ''}>
+                                                            {c.clinical_observations || 'N/A'}
+                                                        </td>
+                                                        <td className="p-3 text-slate-600 whitespace-nowrap">
+                                                            {c.followup_date || '--'}
+                                                        </td>
+                                                        <td className="p-3 text-slate-700 truncate" title={c.medicines?.map(m => m.medicine).join(', ') || ''}>
+                                                            {c.medicines?.map(m => m.medicine).join(', ') || '--'}
+                                                        </td>
+                                                        <td className="p-3 text-center whitespace-nowrap">
+                                                            <button
+                                                                onClick={() => startEditCase(c.id, c.patient_id)}
+                                                                className="p-1.5 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white transition shadow-2xs"
+                                                                title="Edit this Visit in Consultation Desk"
+                                                            >
+                                                                <Pencil className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </td>
+                                                        <td className="p-3 text-center whitespace-nowrap">
+                                                            <button
+                                                                onClick={async () => {
+                                                                    const res = await axios.get(`${API_BASE}/cases/${c.id}`);
+                                                                    setViewCaseModal(res.data);
+                                                                }}
+                                                                className="p-1.5 rounded-lg bg-purple-50 text-[#502479] hover:bg-[#502479] hover:text-white transition shadow-2xs"
+                                                                title="Inspect Full Visit Details"
+                                                            >
+                                                                <Eye className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </td>
+                                                        <td className="p-3 text-center whitespace-nowrap">
+                                                            <a
+                                                                href={`${API_BASE}/cases/${c.id}/pdf`}
+                                                                target="_blank"
+                                                                rel="noreferrer"
+                                                                className="inline-block p-1.5 rounded-lg bg-teal-50 text-[#208396] hover:bg-[#208396] hover:text-white transition shadow-2xs"
+                                                                title="Download Rx PDF"
+                                                            >
+                                                                <Download className="w-3.5 h-3.5" />
+                                                            </a>
+                                                        </td>
+                                                        <td className="p-3 text-center whitespace-nowrap">
+                                                            <button
+                                                                onClick={() => handleDeleteCase(c.id)}
+                                                                className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition shadow-2xs"
+                                                                title="Delete this Visit"
+                                                            >
+                                                                <Trash2 className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </main>
             </div>
 
